@@ -113,10 +113,6 @@ func (c *Client) do(
 	method string, route *url.URL, body io.Reader,
 	opts ...func(req *http.Request),
 ) (*http.Response, error) {
-	if err := c.login(); err != nil {
-		return nil, err
-	}
-
 	req, err := http.NewRequestWithContext(
 		ctx, method, route.String(), body,
 	)
@@ -124,7 +120,10 @@ func (c *Client) do(
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	c.setCommonHeaders(req)
+	err = c.setCommonHeaders(req)
+	if err != nil {
+		return nil, err
+	}
 
 	for i := range opts {
 		opts[i](req)

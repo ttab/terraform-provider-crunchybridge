@@ -28,7 +28,7 @@ import (
 func dataSourceCluster() *schema.Resource {
 	return &schema.Resource{
 		Description: "Data Source for retreiving Cluster resource data",
-		ReadContext: dataSourceClusterRead,
+		ReadContext: clusterDataRead,
 		Schema: map[string]*schema.Schema{
 			// "Request" Fields
 			"id": {
@@ -52,7 +52,7 @@ func dataSourceCluster() *schema.Resource {
 				Description: "Whether the cluster is high availability, meaning that it has a secondary it can fail over to quickly in case the primary becomes unavailable.",
 				Type:        schema.TypeBool,
 			},
-			"postgres_version_id": {
+			"major_version": {
 				Computed:    true,
 				Description: "The cluster's major Postgres version. For example, `14`.",
 				Type:        schema.TypeInt,
@@ -111,7 +111,7 @@ func dataSourceCluster() *schema.Resource {
 	}
 }
 
-func dataSourceClusterRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func clusterDataRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	client := meta.(*bridgeapi.Client)
 
 	id := d.Get("id").(string)
@@ -129,7 +129,7 @@ func dataSourceClusterRead(ctx context.Context, d *schema.ResourceData, meta int
 		"cpu":                      cd.CPU,
 		"created_at":               cd.Created.Format(time.RFC3339),
 		"is_ha":                    cd.HighAvailability,
-		"postgres_version_id":      cd.PGMajorVersion,
+		"major_version":            cd.PGMajorVersion,
 		"maintenance_window_start": cd.MaintWindowStart,
 		"memory":                   cd.MemoryGB,
 		"name":                     cd.Name,

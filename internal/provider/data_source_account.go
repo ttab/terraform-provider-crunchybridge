@@ -111,23 +111,20 @@ func dataSourceAccountRead(ctx context.Context, d *schema.ResourceData, meta int
 		return diag.Errorf("failed to retrieve account teams: %v", err)
 	}
 
-	// REVIEW: Given personal team, should always be true, remove?
-	if len(teams) > 0 {
-		var teamInfo []interface{}
+	var teamInfo []interface{}
 
-		for _, team := range teams {
-			teamItem := map[string]interface{}{
-				"team_id":   team.ID,
-				"team_name": team.Name,
-				"team_role": team.Role,
-			}
-			teamInfo = append(teamInfo, teamItem)
+	for _, team := range teams {
+		teamItem := map[string]interface{}{
+			"team_id":   team.ID,
+			"team_name": team.Name,
+			"team_role": team.Role,
 		}
+		teamInfo = append(teamInfo, teamItem)
+	}
 
-		err := d.Set("team_membership", teamInfo)
-		if err != nil {
-			diags = append(diags, diag.FromErr(err)...)
-		}
+	err = d.Set("team_membership", teamInfo)
+	if err != nil {
+		return diag.Errorf("failed to retrieve account teams: %v", err)
 	}
 
 	return diags

@@ -17,6 +17,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 
 	"github.com/CrunchyData/terraform-provider-crunchybridge/internal/bridgeapi"
@@ -26,10 +27,11 @@ import (
 )
 
 const (
-	idConfigName     = "application_id"
-	secretConfigName = "application_secret"
-	urlConfigName    = "bridgeapi_url"
-	tokenConfigName  = "require_token_swap"
+	idConfigName             = "application_id"
+	secretConfigName         = "application_secret"
+	apiKeyConfigName         = "api_key"
+	urlConfigName            = "bridgeapi_url"
+	immediateLoginConfigName = "immediate_login"
 )
 
 func init() {
@@ -63,22 +65,29 @@ func New(version string) func() *schema.Provider {
 				"crunchybridge_cluster": resourceCluster(),
 			},
 			Schema: map[string]*schema.Schema{
+				apiKeyConfigName: {
+					Type:        schema.TypeString,
+					Description: "The application id component of the Crunchy Bridge API key.",
+					DefaultFunc: schema.EnvDefaultFunc("API_KEY", ""),
+					Optional:    true,
+				},
 				idConfigName: {
 					Type:        schema.TypeString,
 					Description: "The application id component of the Crunchy Bridge API key.",
 					DefaultFunc: schema.EnvDefaultFunc("APPLICATION_ID", ""),
-					Required:    true,
+					Optional:    true,
 				},
 				secretConfigName: {
 					Type:        schema.TypeString,
 					Description: "The application secret component of the Crunchy Bridge API key.",
 					DefaultFunc: schema.EnvDefaultFunc("APPLICATION_SECRET", ""),
-					Required:    true,
-				},
-				tokenConfigName: {
-					Type:        schema.TypeBool,
-					Description: "When true, forces an exchange of the API key for a short-lived bearer token.",
 					Optional:    true,
+				},
+				immediateLoginConfigName: {
+					Type: schema.TypeBool,
+					Description: fmt.Sprintf("When true, %q and %q will be validated when the provider is configured.",
+						idConfigName, secretConfigName),
+					Optional: true,
 				},
 				urlConfigName: {
 					Type:        schema.TypeString,
@@ -104,30 +113,37 @@ func configure(version string, p *schema.Provider) func(context.Context, *schema
 
 		id := d.Get(idConfigName).(string)
 		secret := d.Get(secretConfigName).(string)
-		if (id == "") || (secret == "") {
-			return nil, diag.Errorf("%s and %s must be configured to non-empty strings for this provider", idConfigName, secretConfigName)
-		}
-		login := bridgeapi.Login{
-			Key:    id,
-			Secret: secret,
+		apiKey := d.Get(apiKeyConfigName).(string)
+		immediateLogin := d.Get(immediateLoginConfigName).(bool)
+
+		var token bridgeapi.TokenSource
+
+		switch {
+		case id != "" && secret != "":
+			token = bridgeapi.NewLegacyAuth(id, secret)
+		case apiKey != "":
+			token = bridgeapi.APIKeyAuth(apiKey)
+		default:
+			return nil, diag.Errorf(
+				"either supply %q or %q and %q for authentication",
+				apiKeyConfigName, idConfigName, secretConfigName)
 		}
 
 		apiUrl, err := url.Parse(d.Get(urlConfigName).(string))
 		if err != nil {
-			return nil, diag.FromErr(err)
+			return nil, diag.Errorf(
+				"invalid %q: %v", urlConfigName, err)
 		}
 
 		options := []bridgeapi.ClientOption{
-			bridgeapi.WithContext(ctx),
 			bridgeapi.WithUserAgent(userAgent),
 		}
 
-		swapReq := d.Get(tokenConfigName).(bool)
-		if swapReq {
-			options = append(options, bridgeapi.WithTokenExchange(), bridgeapi.WithImmediateLogin())
+		if immediateLogin {
+			options = append(options, bridgeapi.WithImmediateLogin())
 		}
 
-		c, err := bridgeapi.NewClient(apiUrl, login, options...)
+		c, err := bridgeapi.NewClient(apiUrl, token, options...)
 		if err != nil {
 			return nil, diag.FromErr(err)
 		}

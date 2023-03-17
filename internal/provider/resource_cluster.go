@@ -38,7 +38,7 @@ func resourceCluster() *schema.Resource {
 		Description: "Cluster resource for the Crunchy Bridge Terraform Provider",
 
 		CreateContext: resourceClusterCreate,
-		ReadContext:   resourceClusterRead,
+		ReadContext:   clusterDataRead,
 		UpdateContext: resourceClusterUpdate,
 		DeleteContext: resourceClusterDelete,
 
@@ -196,49 +196,8 @@ func resourceClusterCreate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	readDiag := resourceClusterRead(ctx, d, meta)
+	readDiag := clusterDataRead(ctx, d, meta)
 	diags = append(diags, readDiag...)
-
-	return diags
-}
-
-func resourceClusterRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	client := meta.(*bridgeapi.Client)
-
-	id := d.Get("id").(string)
-
-	cd, err := client.ClusterDetail(ctx, id)
-	if err != nil {
-		return diag.Errorf("failed to get cluster details: %v", err)
-	}
-
-	var diags diag.Diagnostics
-
-	set := map[string]interface{}{
-		"id":                       cd.ID,
-		"cpu":                      cd.CPU,
-		"created_at":               cd.Created.Format(time.RFC3339),
-		"is_ha":                    cd.HighAvailability,
-		"major_version":            cd.PGMajorVersion,
-		"maintenance_window_start": cd.MaintWindowStart,
-		"memory":                   cd.MemoryGB,
-		"name":                     cd.Name,
-		"plan_id":                  cd.PlanID,
-		"provider_id":              cd.ProviderID,
-		"region_id":                cd.RegionID,
-		"storage":                  cd.StorageGB,
-		"team_id":                  cd.TeamID,
-		"updated_at":               cd.Updated.Format(time.RFC3339),
-	}
-
-	for k, v := range set {
-		err := d.Set(k, v)
-		if err != nil {
-			diags = append(diags, diag.Errorf(
-				"failed to set %q: %v", k, err,
-			)...)
-		}
-	}
 
 	return diags
 }
@@ -302,7 +261,7 @@ func resourceClusterUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	readDiag := resourceClusterRead(ctx, d, meta)
+	readDiag := clusterDataRead(ctx, d, meta)
 	diags = append(diags, readDiag...)
 
 	return diags
